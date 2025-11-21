@@ -114,9 +114,9 @@ class TaskManager {
         this.showToast('✅ Synced from Google Sheets!');
     }
 
-    async saveToGoogleSheets(task) {
+        async saveToGoogleSheets(task) {
         if (this.syncInProgress) {
-            this.showToast('⏳ Sync in progress, please wait...');
+            this.showToast('⏳ Sync in progress...');
             return false;
         }
 
@@ -124,249 +124,26 @@ class TaskManager {
         this.showLoading(true);
 
         try {
-            // Prepare data for Google Sheets
-            const taskData = [[
-                task.id,
-                task.area,
-                task.task,
-                task.status,
-                task.deadline,
-                task.priority.toUpperCase(),
-                task.notes || '',
-                task.completed ? 'TRUE' : 'FALSE',
-                JSON.stringify(task.comments || [])
-            ]];
+            const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'text/plain'},
+                body: JSON.stringify({
+                    action: 'updateTask',
+                    task: task
+                })
+            });
 
-            // Find the row number for this task
-            const allTasksResponse = await fetch(
-                `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${encodeURIComponent(this.SHEET_NAME)}!A:A?key=${this.API_KEY}`
-            );
-
-            if (!allTasksResponse.ok) {
-                throw new Error('Failed to fetch task list');
-            }
-
-            const allTasksData = await allTasksResponse.json();
-            const allIds = (allTasksData.values || []).map(row => row[0]);
-            const rowIndex = allIds.indexOf(task.id);
-
-            if (rowIndex > 0) {
-                // Update existing row
-                const range = `${encodeURIComponent(this.SHEET_NAME)}!A${rowIndex + 1}:I${rowIndex + 1}`;
-                const updateUrl = `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${range}?valueInputOption=RAW&key=${this.API_KEY}`;
-
-                const response = await fetch(updateUrl, {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({values: taskData})
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to update task in Google Sheets');
-                }
-
-                this.showToast('✅ Saved to Google Sheets!');
-            } else {
-                // Append new row
-                const appendUrl = `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${encodeURIComponent(this.SHEET_NAME)}!A:I:append?valueInputOption=RAW&key=${this.API_KEY}`;
-
-                const response = await fetch(appendUrl, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({values: taskData})
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to add task to Google Sheets');
-                }
-
-                this.showToast('✅ Added to Google Sheets!');
-            }
-
+            this.showToast('✅ Saved to Google Sheets!');
             this.syncInProgress = false;
             this.showLoading(false);
             return true;
         } catch (error) {
-            console.error('Error saving to Google Sheets:', error);
-            this.showToast('⚠️ Failed to save. Saved locally only.');
+            console.error('Error:', error);
+            this.showToast('⚠️ Save failed. Saved locally.');
             this.syncInProgress = false;
             this.showLoading(false);
             return false;
         }
-    }
-
-    loadSampleData() {
-        this.tasks = [
-            {id: 'ph_1', area: 'PRASADAM HALL', task: 'Finalize ceiling design', status: 'MATERIAL & DESIGN IS STILL TO BE FINALIZED', deadline: '2025-11-30', priority: 'high', notes: '', completed: false, comments: []},
-            {id: 'ph_2', area: 'PRASADAM HALL', task: 'Choose floor and wall tiles', status: 'PENDING - market visit today', deadline: '2025-11-21', priority: 'high', notes: '', completed: false, comments: []},
-            {id: 'ta_1', area: 'TEMPLE AREA', task: 'Complete internal electrical wiring', status: 'PLANNED', deadline: '2025-12-01', priority: 'high', notes: '', completed: false, comments: []},
-            {id: 'ta_2', area: 'TEMPLE AREA', task: 'Install distribution boards', status: 'PLANNED', deadline: '2025-12-03', priority: 'high', notes: '', completed: false, comments: []},
-            {id: 'ab_1', area: 'ASHRAM / BRAHMACHARI AREA', task: 'Window installation', status: 'COMPLETED', deadline: '2025-11-20', priority: 'medium', notes: 'Verify completion', completed: false, comments: []},
-            {id: 'st_1', area: 'STP & PUBLIC TOILET', task: 'Monitor public toilet', status: 'ALL CLEAR - functioning properly', deadline: '2025-12-01', priority: 'low', notes: 'Newly completed', completed: false, comments: []}
-        ];
-        this.saveTasks();
-    }
-
-    parseComments(commentsStr) {
-        try {
-            const parsed = JSON.parse(commentsStr);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch { return []; }
-    }
-
-    async syncTasksInBackground() {
-        try {
-            await this.loadFromGoogleSheets();
-            this.applyFilters();
-            this.updateStats();
-            this.updateProgressBars();
-        } catch (error) {
-            console.log('Background sync failed:', error);
-        }
-    }
-
-    async syncTasks() {
-        this.showLoading(true);
-        this.showToast('🔄 Syncing with Google Sheets...');
-
-        try {
-            await this.loadFromGoogleSheets();
-            this.applyFilters();
-            this.updateStats();
-            this.updateProgressBars();
-        } catch (error) {
-            console.error('Sync error:', error);
-            this.showToast('⚠️ Sync failed. Check API key restrictions.');
-        }
-
-        this.showLoading(false);
-    }
-
-    updateProgressBars() {
-        // Calculate progress for Temple Area
-        const templeTasks = this.tasks.filter(t => t.area && t.area.toUpperCase().includes('TEMPLE'));
-        const templeCompleted = templeTasks.filter(t => t.completed).length;
-        const templeProgress = templeTasks.length > 0 ? Math.round((templeCompleted / templeTasks.length) * 100) : 0;
-
-        // Calculate progress for Prasadam Hall
-        const prasadamTasks = this.tasks.filter(t => t.area && t.area.toUpperCase().includes('PRASADAM'));
-        const prasadamCompleted = prasadamTasks.filter(t => t.completed).length;
-        const prasadamProgress = prasadamTasks.length > 0 ? Math.round((prasadamCompleted / prasadamTasks.length) * 100) : 0;
-
-        // Calculate overall progress
-        const totalCompleted = this.tasks.filter(t => t.completed).length;
-        const overallProgress = this.tasks.length > 0 ? Math.round((totalCompleted / this.tasks.length) * 100) : 0;
-
-        // Update progress bars
-        document.getElementById('templeProgress').textContent = templeProgress + '%';
-        document.getElementById('templeBar').style.width = templeProgress + '%';
-
-        document.getElementById('prasadamProgress').textContent = prasadamProgress + '%';
-        document.getElementById('prasadamBar').style.width = prasadamProgress + '%';
-
-        document.getElementById('overallProgress').textContent = overallProgress + '%';
-        document.getElementById('overallBar').style.width = overallProgress + '%';
-    }
-
-    renderTasks() {
-        const container = document.getElementById('tasksContainer');
-
-        if (this.filteredTasks.length === 0) {
-            container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><span class="material-icons" style="font-size: 4rem; opacity: 0.3;">inbox</span><p style="margin-top: 1rem; font-size: 1.125rem;">No tasks found</p></div>';
-            return;
-        }
-
-        container.innerHTML = this.filteredTasks.map(task => {
-            const isOverdue = new Date(task.deadline) < new Date() && !task.completed;
-            const commentCount = task.comments ? task.comments.length : 0;
-
-            return `<div class="task-card priority-${task.priority} ${task.completed ? 'completed' : ''}" onclick="taskManager.openTaskModal('${task.id}')"><div class="task-header"><div style="flex: 1;"><div class="task-title">${this.escapeHtml(task.task)}</div><div class="task-area">${this.escapeHtml(task.area)}</div></div><span class="priority-badge ${task.priority}">${task.priority}</span></div><div class="task-status">${this.escapeHtml(task.status)}</div><div class="task-footer"><div class="task-deadline ${isOverdue ? 'overdue' : ''}"><span class="material-icons" style="font-size: 1rem;">event</span><span>${this.formatDate(task.deadline)}</span></div><div class="task-actions" onclick="event.stopPropagation()">${commentCount > 0 ? `<span style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);"><span class="material-icons" style="font-size: 1rem;">comment</span>${commentCount}</span>` : ''}<button class="task-action-btn complete" onclick="taskManager.toggleComplete('${task.id}')" title="${task.completed ? 'Mark as incomplete' : 'Mark as complete'}"><span class="material-icons">${task.completed ? 'check_circle' : 'radio_button_unchecked'}</span></button></div></div></div>`;
-        }).join('');
-    }
-
-    openTaskModal(taskId = null) {
-        this.currentTaskId = taskId;
-        const modal = document.getElementById('taskModal');
-
-        if (taskId) {
-            const task = this.tasks.find(t => t.id === taskId);
-            if (task) {
-                document.getElementById('modalTitle').textContent = 'Edit Task';
-                document.getElementById('modalArea').value = task.area;
-                document.getElementById('modalTask').value = task.task;
-                document.getElementById('modalStatus').value = task.status;
-                document.getElementById('modalDeadline').value = task.deadline;
-                document.getElementById('modalPriority').value = task.priority;
-                document.getElementById('modalNotes').value = task.notes || '';
-                document.getElementById('modalCompleted').checked = task.completed;
-                this.renderComments(task.comments || []);
-            }
-        } else {
-            document.getElementById('modalTitle').textContent = 'New Task';
-            document.getElementById('modalArea').value = '';
-            document.getElementById('modalTask').value = '';
-            document.getElementById('modalStatus').value = '';
-            document.getElementById('modalDeadline').value = '';
-            document.getElementById('modalPriority').value = 'medium';
-            document.getElementById('modalNotes').value = '';
-            document.getElementById('modalCompleted').checked = false;
-            this.renderComments([]);
-        }
-
-        document.getElementById('newComment').value = '';
-        modal.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-
-    closeModal() {
-        document.getElementById('taskModal').classList.remove('active');
-        document.body.style.overflow = '';
-        this.currentTaskId = null;
-    }
-
-    async saveTask() {
-        const area = document.getElementById('modalArea').value.trim();
-        const task = document.getElementById('modalTask').value.trim();
-        const status = document.getElementById('modalStatus').value.trim();
-        const deadline = document.getElementById('modalDeadline').value;
-        const priority = document.getElementById('modalPriority').value;
-        const notes = document.getElementById('modalNotes').value.trim();
-        const completed = document.getElementById('modalCompleted').checked;
-
-        if (!area || !task || !status || !deadline) {
-            this.showToast('Please fill in all required fields');
-            return;
-        }
-
-        let taskObj;
-        if (this.currentTaskId) {
-            const taskIndex = this.tasks.findIndex(t => t.id === this.currentTaskId);
-            if (taskIndex !== -1) {
-                this.tasks[taskIndex] = {
-                    ...this.tasks[taskIndex],
-                    area, task, status, deadline, priority, notes, completed
-                };
-                taskObj = this.tasks[taskIndex];
-            }
-        } else {
-            taskObj = {
-                id: 'task_' + Date.now(),
-                area, task, status, deadline, priority, notes, completed,
-                comments: []
-            };
-            this.tasks.unshift(taskObj);
-        }
-
-        this.saveTasks();
-
-        // Save to Google Sheets
-        await this.saveToGoogleSheets(taskObj);
-
-        this.applyFilters();
-        this.updateStats();
-        this.updateProgressBars();
-        this.populateAreaFilter();
-        this.closeModal();
     }
 
     async toggleComplete(taskId) {
