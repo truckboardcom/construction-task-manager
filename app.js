@@ -1,4 +1,4 @@
-// Task Manager Application
+// AI Task Manager Application with Two-way Google Sheets Sync
 class TaskManager {
     constructor() {
         this.tasks = [];
@@ -7,6 +7,7 @@ class TaskManager {
         this.SPREADSHEET_ID = CONFIG.SPREADSHEET_ID;
         this.API_KEY = CONFIG.API_KEY;
         this.SHEET_NAME = CONFIG.SHEET_NAME;
+        this.syncInProgress = false;
         this.init();
     }
 
@@ -21,29 +22,16 @@ class TaskManager {
     }
 
     attachEventListeners() {
-        // Sync button
         document.getElementById('syncBtn').addEventListener('click', () => this.syncTasks());
-
-        // Add task button
         document.getElementById('addTaskBtn').addEventListener('click', () => this.openTaskModal());
-
-        // Search
         document.getElementById('searchInput').addEventListener('input', (e) => this.handleSearch(e.target.value));
-
-        // Filters
         document.getElementById('areaFilter').addEventListener('change', () => this.applyFilters());
         document.getElementById('statusFilter').addEventListener('change', () => this.applyFilters());
         document.getElementById('priorityFilter').addEventListener('change', () => this.applyFilters());
-
-        // Modal controls
         document.getElementById('modalClose').addEventListener('click', () => this.closeModal());
         document.getElementById('modalCancel').addEventListener('click', () => this.closeModal());
         document.getElementById('modalSave').addEventListener('click', () => this.saveTask());
-
-        // Add comment
         document.getElementById('addCommentBtn').addEventListener('click', () => this.addComment());
-
-        // Close modal on outside click
         document.getElementById('taskModal').addEventListener('click', (e) => {
             if (e.target.id === 'taskModal') this.closeModal();
         });
@@ -52,7 +40,6 @@ class TaskManager {
     async loadTasks() {
         this.showLoading(true);
 
-        // Try to load from localStorage first (faster)
         const savedTasks = localStorage.getItem('constructionTasks');
         if (savedTasks) {
             try {
@@ -60,10 +47,9 @@ class TaskManager {
                 this.filteredTasks = [...this.tasks];
                 this.renderTasks();
                 this.updateStats();
+                this.updateProgressBars();
                 this.populateAreaFilter();
                 this.showLoading(false);
-
-                // Then try to sync in background
                 this.syncTasksInBackground();
                 return;
             } catch (e) {
@@ -71,18 +57,18 @@ class TaskManager {
             }
         }
 
-        // Try to load from Google Sheets
         try {
             await this.loadFromGoogleSheets();
         } catch (error) {
             console.log('Google Sheets load failed, using sample data:', error);
-            this.showToast('⚠️ Google Sheets sync failed. Check API key restrictions. Using sample data.');
+            this.showToast('⚠️ Check API key. Using sample data.');
             this.loadSampleData();
         }
 
         this.filteredTasks = [...this.tasks];
         this.renderTasks();
         this.updateStats();
+        this.updateProgressBars();
         this.populateAreaFilter();
         this.showLoading(false);
     }
@@ -93,18 +79,15 @@ class TaskManager {
         }
 
         const url = `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${encodeURIComponent(this.SHEET_NAME)}!A:I?key=${this.API_KEY}`;
-
         const response = await fetch(url);
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             console.error('Google Sheets API error:', errorData);
 
-            // Check if it's a referrer restriction issue
             if (errorData.error && errorData.error.code === 403) {
-                throw new Error('API key is restricted. Please add https://truckboardcom.github.io/* to allowed referrers in Google Cloud Console.');
+                throw new Error('API key restricted. Add https://truckboardcom.github.io/* to allowed referrers.');
             }
-
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -115,7 +98,6 @@ class TaskManager {
             throw new Error('No data in sheet');
         }
 
-        // Skip header row
         this.tasks = rows.slice(1).map(row => ({
             id: row[0] || '',
             area: row[1] || '',
@@ -126,82 +108,101 @@ class TaskManager {
             notes: row[6] || '',
             completed: row[7] === 'TRUE',
             comments: this.parseComments(row[8] || '[]')
-        })).filter(task => task.id); // Filter out empty rows
+        })).filter(task => task.id);
 
-        // Save to localStorage as backup
         this.saveTasks();
-        this.showToast('✅ Synced with Google Sheets!');
+        this.showToast('✅ Synced from Google Sheets!');
+    }
+
+    async saveToGoogleSheets(task) {
+        if (this.syncInProgress) {
+            this.showToast('⏳ Sync in progress, please wait...');
+            return false;
+        }
+
+        this.syncInProgress = true;
+        this.showLoading(true);
+
+        try {
+            // Prepare data for Google Sheets
+            const taskData = [[
+                task.id,
+                task.area,
+                task.task,
+                task.status,
+                task.deadline,
+                task.priority.toUpperCase(),
+                task.notes || '',
+                task.completed ? 'TRUE' : 'FALSE',
+                JSON.stringify(task.comments || [])
+            ]];
+
+            // Find the row number for this task
+            const allTasksResponse = await fetch(
+                `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${encodeURIComponent(this.SHEET_NAME)}!A:A?key=${this.API_KEY}`
+            );
+
+            if (!allTasksResponse.ok) {
+                throw new Error('Failed to fetch task list');
+            }
+
+            const allTasksData = await allTasksResponse.json();
+            const allIds = (allTasksData.values || []).map(row => row[0]);
+            const rowIndex = allIds.indexOf(task.id);
+
+            if (rowIndex > 0) {
+                // Update existing row
+                const range = `${encodeURIComponent(this.SHEET_NAME)}!A${rowIndex + 1}:I${rowIndex + 1}`;
+                const updateUrl = `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${range}?valueInputOption=RAW&key=${this.API_KEY}`;
+
+                const response = await fetch(updateUrl, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({values: taskData})
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update task in Google Sheets');
+                }
+
+                this.showToast('✅ Saved to Google Sheets!');
+            } else {
+                // Append new row
+                const appendUrl = `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${encodeURIComponent(this.SHEET_NAME)}!A:I:append?valueInputOption=RAW&key=${this.API_KEY}`;
+
+                const response = await fetch(appendUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({values: taskData})
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to add task to Google Sheets');
+                }
+
+                this.showToast('✅ Added to Google Sheets!');
+            }
+
+            this.syncInProgress = false;
+            this.showLoading(false);
+            return true;
+        } catch (error) {
+            console.error('Error saving to Google Sheets:', error);
+            this.showToast('⚠️ Failed to save. Saved locally only.');
+            this.syncInProgress = false;
+            this.showLoading(false);
+            return false;
+        }
     }
 
     loadSampleData() {
-        // Load sample data based on what we know from the sheet
         this.tasks = [
-            {
-                id: 'ph_1',
-                area: 'PRASADAM HALL',
-                task: 'Finalize ceiling design',
-                status: 'MATERIAL & DESIGN IS STILL TO BE FINALIZED',
-                deadline: '2025-11-30',
-                priority: 'high',
-                notes: '',
-                completed: false,
-                comments: []
-            },
-            {
-                id: 'ph_2',
-                area: 'PRASADAM HALL',
-                task: 'Choose floor and wall tiles with Achintya Krishna',
-                status: 'PENDING - market visit today',
-                deadline: '2025-11-21',
-                priority: 'high',
-                notes: '',
-                completed: false,
-                comments: []
-            },
-            {
-                id: 'ph_3',
-                area: 'PRASADAM HALL',
-                task: 'Place orders for tiles, cables, trays, materials',
-                status: 'CABLE TRAY IN STOCK WORK WILL BE FINISHED ON 22/11/25',
-                deadline: '2025-11-22',
-                priority: 'medium',
-                notes: 'Once selections are approved',
-                completed: false,
-                comments: []
-            },
-            {
-                id: 'ab_1',
-                area: 'ASHRAM / BRAHMACHARI AREA',
-                task: 'One large ashram window installation',
-                status: 'COMPLETED',
-                deadline: '2025-11-20',
-                priority: 'medium',
-                notes: 'Verify completion',
-                completed: false,
-                comments: []
-            },
-            {
-                id: 'st_1',
-                area: 'STP & PUBLIC TOILET',
-                task: 'Monitor public toilet functioning',
-                status: 'ALL CLEAR - functioning properly',
-                deadline: '2025-12-01',
-                priority: 'low',
-                notes: 'Newly completed',
-                completed: false,
-                comments: []
-            },
-            {
-                id: 'pa_1',
-                area: 'ROAD (PAVER AREA)',
-                task: 'Reassess expectations for leveling',
-                status: 'DONE',
-                deadline: '2025-11-20',
-                priority: 'medium',
-                notes: 'Due to sand-based paver installation',
-                completed: false,
-                comments: []
-            }
+            {id: 'ph_1', area: 'PRASADAM HALL', task: 'Finalize ceiling design', status: 'MATERIAL & DESIGN IS STILL TO BE FINALIZED', deadline: '2025-11-30', priority: 'high', notes: '', completed: false, comments: []},
+            {id: 'ph_2', area: 'PRASADAM HALL', task: 'Choose floor and wall tiles', status: 'PENDING - market visit today', deadline: '2025-11-21', priority: 'high', notes: '', completed: false, comments: []},
+            {id: 'ta_1', area: 'TEMPLE AREA', task: 'Complete internal electrical wiring', status: 'PLANNED', deadline: '2025-12-01', priority: 'high', notes: '', completed: false, comments: []},
+            {id: 'ta_2', area: 'TEMPLE AREA', task: 'Install distribution boards', status: 'PLANNED', deadline: '2025-12-03', priority: 'high', notes: '', completed: false, comments: []},
+            {id: 'ab_1', area: 'ASHRAM / BRAHMACHARI AREA', task: 'Window installation', status: 'COMPLETED', deadline: '2025-11-20', priority: 'medium', notes: 'Verify completion', completed: false, comments: []},
+            {id: 'st_1', area: 'STP & PUBLIC TOILET', task: 'Monitor public toilet', status: 'ALL CLEAR - functioning properly', deadline: '2025-12-01', priority: 'low', notes: 'Newly completed', completed: false, comments: []}
         ];
         this.saveTasks();
     }
@@ -210,9 +211,7 @@ class TaskManager {
         try {
             const parsed = JSON.parse(commentsStr);
             return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
+        } catch { return []; }
     }
 
     async syncTasksInBackground() {
@@ -220,8 +219,8 @@ class TaskManager {
             await this.loadFromGoogleSheets();
             this.applyFilters();
             this.updateStats();
+            this.updateProgressBars();
         } catch (error) {
-            // Silent fail for background sync
             console.log('Background sync failed:', error);
         }
     }
@@ -234,24 +233,46 @@ class TaskManager {
             await this.loadFromGoogleSheets();
             this.applyFilters();
             this.updateStats();
+            this.updateProgressBars();
         } catch (error) {
             console.error('Sync error:', error);
-            this.showToast('⚠️ Sync failed. Please check: 1) API key restrictions in Google Cloud Console, 2) Add https://truckboardcom.github.io/* to allowed referrers');
+            this.showToast('⚠️ Sync failed. Check API key restrictions.');
         }
 
         this.showLoading(false);
+    }
+
+    updateProgressBars() {
+        // Calculate progress for Temple Area
+        const templeTasks = this.tasks.filter(t => t.area && t.area.toUpperCase().includes('TEMPLE'));
+        const templeCompleted = templeTasks.filter(t => t.completed).length;
+        const templeProgress = templeTasks.length > 0 ? Math.round((templeCompleted / templeTasks.length) * 100) : 0;
+
+        // Calculate progress for Prasadam Hall
+        const prasadamTasks = this.tasks.filter(t => t.area && t.area.toUpperCase().includes('PRASADAM'));
+        const prasadamCompleted = prasadamTasks.filter(t => t.completed).length;
+        const prasadamProgress = prasadamTasks.length > 0 ? Math.round((prasadamCompleted / prasadamTasks.length) * 100) : 0;
+
+        // Calculate overall progress
+        const totalCompleted = this.tasks.filter(t => t.completed).length;
+        const overallProgress = this.tasks.length > 0 ? Math.round((totalCompleted / this.tasks.length) * 100) : 0;
+
+        // Update progress bars
+        document.getElementById('templeProgress').textContent = templeProgress + '%';
+        document.getElementById('templeBar').style.width = templeProgress + '%';
+
+        document.getElementById('prasadamProgress').textContent = prasadamProgress + '%';
+        document.getElementById('prasadamBar').style.width = prasadamProgress + '%';
+
+        document.getElementById('overallProgress').textContent = overallProgress + '%';
+        document.getElementById('overallBar').style.width = overallProgress + '%';
     }
 
     renderTasks() {
         const container = document.getElementById('tasksContainer');
 
         if (this.filteredTasks.length === 0) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                    <span class="material-icons" style="font-size: 4rem; opacity: 0.3;">inbox</span>
-                    <p style="margin-top: 1rem; font-size: 1.125rem;">No tasks found</p>
-                </div>
-            `;
+            container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><span class="material-icons" style="font-size: 4rem; opacity: 0.3;">inbox</span><p style="margin-top: 1rem; font-size: 1.125rem;">No tasks found</p></div>';
             return;
         }
 
@@ -259,42 +280,7 @@ class TaskManager {
             const isOverdue = new Date(task.deadline) < new Date() && !task.completed;
             const commentCount = task.comments ? task.comments.length : 0;
 
-            return `
-                <div class="task-card priority-${task.priority} ${task.completed ? 'completed' : ''}" 
-                     onclick="taskManager.openTaskModal('${task.id}')">
-                    <div class="task-header">
-                        <div style="flex: 1;">
-                            <div class="task-title">${this.escapeHtml(task.task)}</div>
-                            <div class="task-area">${this.escapeHtml(task.area)}</div>
-                        </div>
-                        <span class="priority-badge ${task.priority}">${task.priority}</span>
-                    </div>
-
-                    <div class="task-status">${this.escapeHtml(task.status)}</div>
-
-                    <div class="task-footer">
-                        <div class="task-deadline ${isOverdue ? 'overdue' : ''}">
-                            <span class="material-icons" style="font-size: 1rem;">event</span>
-                            <span>${this.formatDate(task.deadline)}</span>
-                        </div>
-                        <div class="task-actions" onclick="event.stopPropagation()">
-                            ${commentCount > 0 ? `
-                                <span style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
-                                    <span class="material-icons" style="font-size: 1rem;">comment</span>
-                                    ${commentCount}
-                                </span>
-                            ` : ''}
-                            <button class="task-action-btn complete" 
-                                    onclick="taskManager.toggleComplete('${task.id}')"
-                                    title="${task.completed ? 'Mark as incomplete' : 'Mark as complete'}">
-                                <span class="material-icons">
-                                    ${task.completed ? 'check_circle' : 'radio_button_unchecked'}
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            return `<div class="task-card priority-${task.priority} ${task.completed ? 'completed' : ''}" onclick="taskManager.openTaskModal('${task.id}')"><div class="task-header"><div style="flex: 1;"><div class="task-title">${this.escapeHtml(task.task)}</div><div class="task-area">${this.escapeHtml(task.area)}</div></div><span class="priority-badge ${task.priority}">${task.priority}</span></div><div class="task-status">${this.escapeHtml(task.status)}</div><div class="task-footer"><div class="task-deadline ${isOverdue ? 'overdue' : ''}"><span class="material-icons" style="font-size: 1rem;">event</span><span>${this.formatDate(task.deadline)}</span></div><div class="task-actions" onclick="event.stopPropagation()">${commentCount > 0 ? `<span style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);"><span class="material-icons" style="font-size: 1rem;">comment</span>${commentCount}</span>` : ''}<button class="task-action-btn complete" onclick="taskManager.toggleComplete('${task.id}')" title="${task.completed ? 'Mark as incomplete' : 'Mark as complete'}"><span class="material-icons">${task.completed ? 'check_circle' : 'radio_button_unchecked'}</span></button></div></div></div>`;
         }).join('');
     }
 
@@ -333,13 +319,12 @@ class TaskManager {
     }
 
     closeModal() {
-        const modal = document.getElementById('taskModal');
-        modal.classList.remove('active');
+        document.getElementById('taskModal').classList.remove('active');
         document.body.style.overflow = '';
         this.currentTaskId = null;
     }
 
-    saveTask() {
+    async saveTask() {
         const area = document.getElementById('modalArea').value.trim();
         const task = document.getElementById('modalTask').value.trim();
         const status = document.getElementById('modalStatus').value.trim();
@@ -353,101 +338,90 @@ class TaskManager {
             return;
         }
 
+        let taskObj;
         if (this.currentTaskId) {
-            // Update existing task
             const taskIndex = this.tasks.findIndex(t => t.id === this.currentTaskId);
             if (taskIndex !== -1) {
                 this.tasks[taskIndex] = {
                     ...this.tasks[taskIndex],
-                    area,
-                    task,
-                    status,
-                    deadline,
-                    priority,
-                    notes,
-                    completed
+                    area, task, status, deadline, priority, notes, completed
                 };
+                taskObj = this.tasks[taskIndex];
             }
         } else {
-            // Create new task
-            const newTask = {
+            taskObj = {
                 id: 'task_' + Date.now(),
-                area,
-                task,
-                status,
-                deadline,
-                priority,
-                notes,
-                completed,
+                area, task, status, deadline, priority, notes, completed,
                 comments: []
             };
-            this.tasks.unshift(newTask);
+            this.tasks.unshift(taskObj);
         }
 
         this.saveTasks();
+
+        // Save to Google Sheets
+        await this.saveToGoogleSheets(taskObj);
+
         this.applyFilters();
         this.updateStats();
+        this.updateProgressBars();
         this.populateAreaFilter();
         this.closeModal();
-        this.showToast('✅ Task saved successfully!');
     }
 
-    toggleComplete(taskId) {
+    async toggleComplete(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (task) {
             task.completed = !task.completed;
             this.saveTasks();
+
+            // Save to Google Sheets
+            await this.saveToGoogleSheets(task);
+
             this.applyFilters();
             this.updateStats();
+            this.updateProgressBars();
             this.showToast(task.completed ? '✅ Task completed!' : '🔄 Task reopened');
         }
     }
 
     renderComments(comments) {
         const container = document.getElementById('commentsList');
-
         if (comments.length === 0) {
             container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No comments yet</p>';
             return;
         }
-
-        container.innerHTML = comments.map(comment => `
-            <div class="comment-item">
-                <div class="comment-meta">${this.formatDateTime(comment.timestamp)}</div>
-                <div class="comment-text">${this.escapeHtml(comment.text)}</div>
-            </div>
-        `).join('');
+        container.innerHTML = comments.map(comment => `<div class="comment-item"><div class="comment-meta">${this.formatDateTime(comment.timestamp)}</div><div class="comment-text">${this.escapeHtml(comment.text)}</div></div>`).join('');
     }
 
-    addComment() {
+    async addComment() {
         const commentText = document.getElementById('newComment').value.trim();
-
         if (!commentText) {
             this.showToast('Please enter a comment');
             return;
         }
-
         if (!this.currentTaskId) return;
 
         const task = this.tasks.find(t => t.id === this.currentTaskId);
         if (task) {
             if (!task.comments) task.comments = [];
-
             task.comments.push({
                 text: commentText,
                 timestamp: new Date().toISOString()
             });
 
             this.saveTasks();
+
+            // Save to Google Sheets
+            await this.saveToGoogleSheets(task);
+
             this.renderComments(task.comments);
             document.getElementById('newComment').value = '';
             this.showToast('💬 Comment added!');
         }
     }
 
-    handleSearch(query) {
-        this.applyFilters();
-    }
+    handleSearch(query) { this.applyFilters(); }
 
     applyFilters() {
         const searchQuery = document.getElementById('searchInput').value.toLowerCase();
@@ -456,17 +430,10 @@ class TaskManager {
         const priorityFilter = document.getElementById('priorityFilter').value;
 
         this.filteredTasks = this.tasks.filter(task => {
-            const matchesSearch = !searchQuery || 
-                task.task.toLowerCase().includes(searchQuery) ||
-                task.status.toLowerCase().includes(searchQuery) ||
-                task.area.toLowerCase().includes(searchQuery);
-
+            const matchesSearch = !searchQuery || task.task.toLowerCase().includes(searchQuery) || task.status.toLowerCase().includes(searchQuery) || task.area.toLowerCase().includes(searchQuery);
             const matchesArea = !areaFilter || task.area === areaFilter;
-            const matchesStatus = !statusFilter || 
-                (statusFilter === 'completed' && task.completed) ||
-                (statusFilter === 'pending' && !task.completed);
+            const matchesStatus = !statusFilter || (statusFilter === 'completed' && task.completed) || (statusFilter === 'pending' && !task.completed);
             const matchesPriority = !priorityFilter || task.priority === priorityFilter;
-
             return matchesSearch && matchesArea && matchesStatus && matchesPriority;
         });
 
@@ -477,10 +444,7 @@ class TaskManager {
         const areas = [...new Set(this.tasks.map(t => t.area))];
         const select = document.getElementById('areaFilter');
         const currentValue = select.value;
-
-        select.innerHTML = '<option value="">All Areas</option>' + 
-            areas.map(area => `<option value="${this.escapeHtml(area)}">${this.escapeHtml(area)}</option>`).join('');
-
+        select.innerHTML = '<option value="">All Areas</option>' + areas.map(area => `<option value="${this.escapeHtml(area)}">${this.escapeHtml(area)}</option>`).join('');
         if (currentValue) select.value = currentValue;
     }
 
@@ -488,9 +452,7 @@ class TaskManager {
         const total = this.tasks.length;
         const completed = this.tasks.filter(t => t.completed).length;
         const pending = total - completed;
-        const overdue = this.tasks.filter(t => 
-            new Date(t.deadline) < new Date() && !t.completed
-        ).length;
+        const overdue = this.tasks.filter(t => new Date(t.deadline) < new Date() && !t.completed).length;
 
         document.getElementById('totalTasks').textContent = total;
         document.getElementById('completedTasks').textContent = completed;
@@ -498,64 +460,13 @@ class TaskManager {
         document.getElementById('overdueTasks').textContent = overdue;
     }
 
-    saveTasks() {
-        localStorage.setItem('constructionTasks', JSON.stringify(this.tasks));
-    }
-
-    showLoading(show) {
-        const overlay = document.getElementById('loadingOverlay');
-        if (show) {
-            overlay.classList.add('active');
-        } else {
-            overlay.classList.remove('active');
-        }
-    }
-
-    showToast(message) {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.classList.add('show');
-
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 3000);
-    }
-
-    formatDate(dateString) {
-        const date = new Date(dateString);
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        if (date.toDateString() === today.toDateString()) {
-            return 'Today';
-        } else if (date.toDateString() === tomorrow.toDateString()) {
-            return 'Tomorrow';
-        } else {
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        }
-    }
-
-    formatDateTime(isoString) {
-        const date = new Date(isoString);
-        return date.toLocaleString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+    saveTasks() { localStorage.setItem('constructionTasks', JSON.stringify(this.tasks)); }
+    showLoading(show) { document.getElementById('loadingOverlay').classList.toggle('active', show); }
+    showToast(message) { const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 3000); }
+    formatDate(dateString) { const date = new Date(dateString); const today = new Date(); const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1); if (date.toDateString() === today.toDateString()) return 'Today'; else if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'; else return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+    formatDateTime(isoString) { const date = new Date(isoString); return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 }
 
-// Initialize the app
 let taskManager;
-document.addEventListener('DOMContentLoaded', () => {
-    taskManager = new TaskManager();
-});
+document.addEventListener('DOMContentLoaded', () => { taskManager = new TaskManager(); });
