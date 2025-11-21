@@ -3,14 +3,14 @@
 const CONFIG = {
     // Google Sheets Configuration
     SPREADSHEET_ID: '1nTfznnbmz2_8QgRlRBhLZIPEK5LBjRSVyEtVmsIPCzs',
-    API_KEY: 'YOUR_GOOGLE_API_KEY', // Replace with your Google Sheets API key
+    API_KEY: 'AIzaSyC05ENRinbElLswbIfkA1MqY7L8dc_p7sY', // Google Sheets API key
     SHEET_NAME: 'Лист1',
 
     // API Endpoints
     SHEETS_API_BASE: 'https://sheets.googleapis.com/v4/spreadsheets',
 
     // Auto-sync settings
-    AUTO_SYNC_ENABLED: false, // Set to true to enable automatic sync
+    AUTO_SYNC_ENABLED: true, // Enable automatic sync
     AUTO_SYNC_INTERVAL: 300000, // 5 minutes in milliseconds
 
     // App Settings
