@@ -16,7 +16,7 @@
                     <span class="material-icons menu-icon">construction</span>
                     <div class="title-version">
                         <h1>AI Task Manager</h1>
-                        <span class="version-badge">v0.12</span>
+                        <span class="version-badge" id="versionBadge" title="Click to see changelog">v0.12</span>
                     </div>
                 </div>
                 <div class="header-right">
@@ -106,6 +106,7 @@
         </main>
     </div>
 
+    <!-- Task Detail Modal -->
     <div class="modal" id="taskModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -167,6 +168,92 @@
             <div class="modal-footer">
                 <button class="btn-secondary" id="modalCancel">Cancel</button>
                 <button class="btn-primary" id="modalSave">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Changelog Modal -->
+    <div class="modal" id="changelogModal">
+        <div class="modal-content changelog-content">
+            <div class="modal-header">
+                <h2>📋 Version 0.12 - Changelog</h2>
+                <button class="modal-close" id="changelogClose">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body changelog-body">
+                <div class="changelog-section">
+                    <h3>✨ What's New</h3>
+                    <ul class="changelog-list">
+                        <li><span class="badge-new">NEW</span> Auto-save functionality - all changes saved automatically</li>
+                        <li><span class="badge-new">NEW</span> Version badge in header with clickable changelog</li>
+                        <li><span class="badge-new">NEW</span> Three progress bars (Temple Area, Prasadam Hall, Overall)</li>
+                        <li><span class="badge-improved">IMPROVED</span> Real-time sync with Google Sheets via Apps Script</li>
+                        <li><span class="badge-improved">IMPROVED</span> Comments now stored in Google Sheets (JSON format)</li>
+                    </ul>
+                </div>
+
+                <div class="changelog-section">
+                    <h3>🔧 Technical Improvements</h3>
+                    <ul class="changelog-list">
+                        <li>Removed manual "Save to Google Sheets" button</li>
+                        <li>Implemented automatic save on task completion</li>
+                        <li>Implemented automatic save on comment addition</li>
+                        <li>Implemented automatic save on task editing</li>
+                        <li>Enhanced mobile responsiveness for progress bars</li>
+                    </ul>
+                </div>
+
+                <div class="changelog-section">
+                    <h3>🛠️ Technologies Used</h3>
+                    <div class="tech-stack">
+                        <div class="tech-item">
+                            <strong>Frontend:</strong>
+                            <span>HTML5, CSS3, Vanilla JavaScript</span>
+                        </div>
+                        <div class="tech-item">
+                            <strong>Styling:</strong>
+                            <span>Material Icons, Inter Font, Custom CSS Grid</span>
+                        </div>
+                        <div class="tech-item">
+                            <strong>Data Storage:</strong>
+                            <span>Google Sheets API (Read), Google Apps Script (Write)</span>
+                        </div>
+                        <div class="tech-item">
+                            <strong>Local Storage:</strong>
+                            <span>Browser LocalStorage for offline support</span>
+                        </div>
+                        <div class="tech-item">
+                            <strong>Hosting:</strong>
+                            <span>GitHub Pages</span>
+                        </div>
+                        <div class="tech-item">
+                            <strong>Architecture:</strong>
+                            <span>Single Page Application (SPA), Progressive Enhancement</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="changelog-section">
+                    <h3>🚀 Features</h3>
+                    <ul class="changelog-list">
+                        <li>✅ Real-time two-way Google Sheets synchronization</li>
+                        <li>✅ Offline-first architecture with LocalStorage</li>
+                        <li>✅ Advanced filtering (area, status, priority)</li>
+                        <li>✅ Real-time search across all task fields</li>
+                        <li>✅ Comment system with timestamps</li>
+                        <li>✅ Priority-based color coding</li>
+                        <li>✅ Deadline tracking with overdue detection</li>
+                        <li>✅ Progress tracking by project area</li>
+                        <li>✅ Mobile-responsive Material Design UI</li>
+                        <li>✅ Auto-save on all changes</li>
+                    </ul>
+                </div>
+
+                <div class="changelog-footer">
+                    <p><strong>Built with ❤️ for construction project management</strong></p>
+                    <p class="changelog-date">Last updated: November 21, 2025</p>
+                </div>
             </div>
         </div>
     </div>
