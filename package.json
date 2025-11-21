@@ -1,0 +1,29 @@
+{
+  "name": "construction-task-manager",
+  "version": "1.0.0",
+  "description": "Modern, mobile-responsive task manager synced with Google Sheets",
+  "main": "index.html",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "python -m http.server 8000",
+    "build": "echo 'No build step required for static site'"
+  },
+  "keywords": [
+    "task-manager",
+    "construction",
+    "google-sheets",
+    "project-management",
+    "mobile-responsive"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/truckboardcom/construction-task-manager.git"
+  }
+}
