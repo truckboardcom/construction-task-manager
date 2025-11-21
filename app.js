@@ -152,8 +152,8 @@ class TaskManager {
             task.completed = !task.completed;
             this.saveTasks();
 
-            // Save to Google Sheets
-            await this.saveToGoogleSheets(task);
+            // AUTO-SAVE to Google Sheets
+            this.saveToGoogleSheets(task);
 
             this.applyFilters();
             this.updateStats();
@@ -162,7 +162,7 @@ class TaskManager {
         }
     }
 
-    renderComments(comments) {
+        renderComments(comments) {
         const container = document.getElementById('commentsList');
         if (comments.length === 0) {
             container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No comments yet</p>';
@@ -189,8 +189,8 @@ class TaskManager {
 
             this.saveTasks();
 
-            // Save to Google Sheets
-            await this.saveToGoogleSheets(task);
+            // AUTO-SAVE to Google Sheets
+            this.saveToGoogleSheets(task);
 
             this.renderComments(task.comments);
             document.getElementById('newComment').value = '';
@@ -198,7 +198,7 @@ class TaskManager {
         }
     }
 
-    handleSearch(query) { this.applyFilters(); }
+        handleSearch(query) { this.applyFilters(); }
 
     applyFilters() {
         const searchQuery = document.getElementById('searchInput').value.toLowerCase();
@@ -246,4 +246,50 @@ class TaskManager {
 }
 
 let taskManager;
-document.addEventListener('DOMContentLoaded', () => { taskManager = new TaskManager(); });
+document.addEventListener('DOMContentLoaded', () => { taskManager = new TaskManager(); })    async saveTask() {
+        const area = document.getElementById('modalArea').value.trim();
+        const task = document.getElementById('modalTask').value.trim();
+        const status = document.getElementById('modalStatus').value.trim();
+        const deadline = document.getElementById('modalDeadline').value;
+        const priority = document.getElementById('modalPriority').value;
+        const notes = document.getElementById('modalNotes').value.trim();
+        const completed = document.getElementById('modalCompleted').checked;
+
+        if (!area || !task || !status || !deadline) {
+            this.showToast('Please fill in all required fields');
+            return;
+        }
+
+        let taskObj;
+        if (this.currentTaskId) {
+            const taskIndex = this.tasks.findIndex(t => t.id === this.currentTaskId);
+            if (taskIndex !== -1) {
+                this.tasks[taskIndex] = {
+                    ...this.tasks[taskIndex],
+                    area, task, status, deadline, priority, notes, completed
+                };
+                taskObj = this.tasks[taskIndex];
+            }
+        } else {
+            taskObj = {
+                id: 'task_' + Date.now(),
+                area, task, status, deadline, priority, notes, completed,
+                comments: []
+            };
+            this.tasks.unshift(taskObj);
+        }
+
+        this.saveTasks();
+
+        // AUTO-SAVE to Google Sheets
+        this.saveToGoogleSheets(taskObj);
+
+        this.applyFilters();
+        this.updateStats();
+        this.updateProgressBars();
+        this.populateAreaFilter();
+        this.closeModal();
+        this.showToast('✅ Saved!');
+    }
+
+;
