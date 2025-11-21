@@ -1,5 +1,12 @@
 // AI Task Manager Application - v0.13
 class TaskManager {
+
+isMobile() {
+    if (typeof navigator === 'undefined') return false;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
+        .test(navigator.userAgent || '');
+}
+
     constructor() {
         this.tasks = [];
         this.filteredTasks = [];
@@ -12,6 +19,61 @@ class TaskManager {
     }
 
     init() {
+
+if (this.isMobile()) {
+    // Полноэкранная заглушка для мобильных устройств
+    document.body.innerHTML = `
+      <div style="
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: radial-gradient(circle at top, #0f172a 0, #020617 55%, #000 100%);
+        color: #e5e7eb;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        text-align: center;
+      ">
+        <div style="max-width: 420px;">
+          <div style="
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:56px;height:56px;
+            border-radius:9999px;
+            background:rgba(37,99,235,0.12);
+            color:#60a5fa;
+            margin-bottom:16px;
+            border:1px solid rgba(148,163,184,0.3);
+          ">
+            <span style="font-size:26px;">🧱</span>
+          </div>
+          <h1 style="font-size:1.5rem;font-weight:600;margin-bottom:8px;letter-spacing:0.02em;">
+            AI Task Manager
+          </h1>
+          <p style="font-size:0.95rem;color:#9ca3af;margin-bottom:12px;">
+            Этот инструмент сейчас доступен только с компьютера.
+          </p>
+          <p style="font-size:0.9rem;color:#6b7280;margin-bottom:18px;">
+            Пожалуйста, откройте эту же ссылку в десктопном браузере, чтобы управлять задачами проекта.
+          </p>
+          <div style="
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            font-size:0.82rem;
+            color:#6b7280;
+            justify-content:center;
+          ">
+            <span style="width:8px;height:8px;border-radius:9999px;background:#22c55e;"></span>
+            <span>Синхронизация и данные работают в десктопной версии</span>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+}
+
         this.loadTasks();
         this.attachEventListeners();
 
