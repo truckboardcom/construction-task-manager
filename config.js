@@ -3,18 +3,21 @@
 const CONFIG = {
     // Google Sheets Configuration
     SPREADSHEET_ID: '1nTfznnbmz2_8QgRlRBhLZIPEK5LBjRSVyEtVmsIPCzs',
-    API_KEY: 'AIzaSyC05ENRinbElLswbIfkA1MqY7L8dc_p7sY', // Google Sheets API key
+    API_KEY: 'AIzaSyC05ENRinbElLswbIfkA1MqY7L8dc_p7sY',
     SHEET_NAME: 'Лист1',
+
+    // Apps Script Web App URL for writing data
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwXUQM-z3gluOHZwAmmY8_2Ej_sI_pngfkABjpsxgwGICQfPPJGiktynmYqo8FzqIAA/exec',
 
     // API Endpoints
     SHEETS_API_BASE: 'https://sheets.googleapis.com/v4/spreadsheets',
 
     // Auto-sync settings
-    AUTO_SYNC_ENABLED: true, // Enable automatic sync
-    AUTO_SYNC_INTERVAL: 300000, // 5 minutes in milliseconds
+    AUTO_SYNC_ENABLED: true,
+    AUTO_SYNC_INTERVAL: 300000,
 
     // App Settings
-    APP_NAME: 'Construction Task Manager',
+    APP_NAME: 'AI Construction Task Manager',
     DATE_FORMAT: 'YYYY-MM-DD',
 
     // Features
