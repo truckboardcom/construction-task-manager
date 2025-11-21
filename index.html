@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Construction Task Manager</title>
+    <title>AI Construction Task Manager</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
@@ -15,7 +15,7 @@
             <div class="header-content">
                 <div class="header-left">
                     <span class="material-icons menu-icon">construction</span>
-                    <h1>Task Manager</h1>
+                    <h1>AI Task Manager</h1>
                 </div>
                 <div class="header-right">
                     <button class="sync-btn" id="syncBtn" title="Sync with Google Sheets">
@@ -23,8 +23,41 @@
                     </button>
                     <button class="add-task-btn" id="addTaskBtn">
                         <span class="material-icons">add</span>
-                        New Task
+                        <span class="btn-text">New Task</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Progress Bars Section -->
+            <div class="progress-section">
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <span class="progress-name">Temple Area</span>
+                        <span class="progress-value" id="templeProgress">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="templeBar"></div>
+                    </div>
+                </div>
+
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <span class="progress-name">Prasadam Hall</span>
+                        <span class="progress-value" id="prasadamProgress">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="prasadamBar"></div>
+                    </div>
+                </div>
+
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <span class="progress-name">Overall</span>
+                        <span class="progress-value" id="overallProgress">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar progress-bar-overall" id="overallBar"></div>
+                    </div>
                 </div>
             </div>
 
@@ -142,9 +175,9 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" id="modalCancel">Cancel</button>
-                <button class="btn-primary" id="modalSave">Save Changes</button>
+                <button class="btn-primary" id="modalSave">Save to Google Sheets</button>
             </div>
-        </div>
+        </main>
     </div>
 
     <!-- Loading Overlay -->
