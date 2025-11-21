@@ -826,3 +826,139 @@ body {
         padding: 0.1875rem 0.375rem;
     }
 }
+
+
+
+/* Changelog Modal Styles */
+.version-badge {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.version-badge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.4);
+}
+
+.changelog-content {
+    max-width: 700px;
+}
+
+.changelog-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.changelog-section {
+    margin-bottom: 2rem;
+}
+
+.changelog-section h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.changelog-list {
+    list-style: none;
+    padding: 0;
+}
+
+.changelog-list li {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.changelog-list li:last-child {
+    border-bottom: none;
+}
+
+.badge-new,
+.badge-improved {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.badge-new {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.badge-improved {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.tech-stack {
+    display: grid;
+    gap: 1rem;
+}
+
+.tech-item {
+    padding: 1rem;
+    background: var(--bg-color);
+    border-radius: var(--radius);
+    border-left: 4px solid var(--primary-color);
+}
+
+.tech-item strong {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tech-item span {
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+}
+
+.changelog-footer {
+    text-align: center;
+    padding-top: 2rem;
+    margin-top: 2rem;
+    border-top: 2px solid var(--border-color);
+}
+
+.changelog-footer p {
+    margin: 0.5rem 0;
+    color: var(--text-secondary);
+}
+
+.changelog-date {
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+@media (max-width: 768px) {
+    .changelog-content {
+        max-width: 100%;
+        margin: 0;
+        border-radius: 0;
+    }
+
+    .changelog-body {
+        max-height: 80vh;
+    }
+
+    .changelog-section h3 {
+        font-size: 1rem;
+    }
+
+    .tech-item {
+        padding: 0.75rem;
+    }
+}
