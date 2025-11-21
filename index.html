@@ -10,12 +10,14 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
         <header class="app-header">
             <div class="header-content">
                 <div class="header-left">
                     <span class="material-icons menu-icon">construction</span>
-                    <h1>AI Task Manager</h1>
+                    <div class="title-version">
+                        <h1>AI Task Manager</h1>
+                        <span class="version-badge">v0.12</span>
+                    </div>
                 </div>
                 <div class="header-right">
                     <button class="sync-btn" id="syncBtn" title="Sync with Google Sheets">
@@ -28,7 +30,6 @@
                 </div>
             </div>
 
-            <!-- Progress Bars Section -->
             <div class="progress-section">
                 <div class="progress-item">
                     <div class="progress-label">
@@ -39,7 +40,6 @@
                         <div class="progress-bar" id="templeBar"></div>
                     </div>
                 </div>
-
                 <div class="progress-item">
                     <div class="progress-label">
                         <span class="progress-name">Prasadam Hall</span>
@@ -49,7 +49,6 @@
                         <div class="progress-bar" id="prasadamBar"></div>
                     </div>
                 </div>
-
                 <div class="progress-item">
                     <div class="progress-label">
                         <span class="progress-name">Overall</span>
@@ -61,7 +60,6 @@
                 </div>
             </div>
 
-            <!-- Search and Filters -->
             <div class="filter-bar">
                 <div class="search-box">
                     <span class="material-icons">search</span>
@@ -84,7 +82,6 @@
             </div>
         </header>
 
-        <!-- Main Content -->
         <main class="main-content">
             <div class="stats-bar">
                 <div class="stat-card">
@@ -105,13 +102,10 @@
                 </div>
             </div>
 
-            <div class="tasks-container" id="tasksContainer">
-                <!-- Tasks will be loaded here -->
-            </div>
+            <div class="tasks-container" id="tasksContainer"></div>
         </main>
     </div>
 
-    <!-- Task Detail Modal -->
     <div class="modal" id="taskModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -158,12 +152,9 @@
                     </label>
                 </div>
 
-                <!-- Comments Section -->
                 <div class="comments-section">
                     <h3>Comments</h3>
-                    <div class="comments-list" id="commentsList">
-                        <!-- Comments will be loaded here -->
-                    </div>
+                    <div class="comments-list" id="commentsList"></div>
                     <div class="comment-input-box">
                         <textarea id="newComment" placeholder="Add a comment..." rows="2"></textarea>
                         <button id="addCommentBtn" class="btn-primary">
@@ -175,17 +166,15 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" id="modalCancel">Cancel</button>
-                <button class="btn-primary" id="modalSave">Save to Google Sheets</button>
+                <button class="btn-primary" id="modalSave">Save Changes</button>
             </div>
-        </main>
+        </div>
     </div>
 
-    <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
     </div>
 
-    <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
 
     <script src="config.js"></script>
