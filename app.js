@@ -52,12 +52,32 @@ class TaskManager {
     async loadTasks() {
         this.showLoading(true);
 
+        // Try to load from localStorage first (faster)
+        const savedTasks = localStorage.getItem('constructionTasks');
+        if (savedTasks) {
+            try {
+                this.tasks = JSON.parse(savedTasks);
+                this.filteredTasks = [...this.tasks];
+                this.renderTasks();
+                this.updateStats();
+                this.populateAreaFilter();
+                this.showLoading(false);
+
+                // Then try to sync in background
+                this.syncTasksInBackground();
+                return;
+            } catch (e) {
+                console.error('Error loading from localStorage:', e);
+            }
+        }
+
         // Try to load from Google Sheets
         try {
             await this.loadFromGoogleSheets();
         } catch (error) {
-            console.log('Google Sheets load failed, using localStorage:', error);
-            this.loadFromLocalStorage();
+            console.log('Google Sheets load failed, using sample data:', error);
+            this.showToast('⚠️ Google Sheets sync failed. Check API key restrictions. Using sample data.');
+            this.loadSampleData();
         }
 
         this.filteredTasks = [...this.tasks];
@@ -75,7 +95,16 @@ class TaskManager {
         const url = `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${encodeURIComponent(this.SHEET_NAME)}!A:I?key=${this.API_KEY}`;
 
         const response = await fetch(url);
+
         if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Google Sheets API error:', errorData);
+
+            // Check if it's a referrer restriction issue
+            if (errorData.error && errorData.error.code === 403) {
+                throw new Error('API key is restricted. Please add https://truckboardcom.github.io/* to allowed referrers in Google Cloud Console.');
+            }
+
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -97,44 +126,84 @@ class TaskManager {
             notes: row[6] || '',
             completed: row[7] === 'TRUE',
             comments: this.parseComments(row[8] || '[]')
-        }));
+        })).filter(task => task.id); // Filter out empty rows
 
         // Save to localStorage as backup
         this.saveTasks();
         this.showToast('✅ Synced with Google Sheets!');
     }
 
-    loadFromLocalStorage() {
-        const savedTasks = localStorage.getItem('constructionTasks');
-        if (savedTasks) {
-            this.tasks = JSON.parse(savedTasks);
-        } else {
-            // Sample data
-            this.tasks = [
-                {
-                    id: 'ph_1',
-                    area: 'PRASADAM HALL',
-                    task: 'Finalize ceiling design',
-                    status: 'MATERIAL & DESIGN IS STILL TO BE FINALIZED',
-                    deadline: '2025-11-30',
-                    priority: 'high',
-                    notes: '',
-                    completed: false,
-                    comments: []
-                },
-                {
-                    id: 'ph_2',
-                    area: 'PRASADAM HALL',
-                    task: 'Choose floor and wall tiles with Achintya Krishna',
-                    status: 'PENDING - market visit today',
-                    deadline: '2025-11-21',
-                    priority: 'high',
-                    notes: '',
-                    completed: false,
-                    comments: []
-                }
-            ];
-        }
+    loadSampleData() {
+        // Load sample data based on what we know from the sheet
+        this.tasks = [
+            {
+                id: 'ph_1',
+                area: 'PRASADAM HALL',
+                task: 'Finalize ceiling design',
+                status: 'MATERIAL & DESIGN IS STILL TO BE FINALIZED',
+                deadline: '2025-11-30',
+                priority: 'high',
+                notes: '',
+                completed: false,
+                comments: []
+            },
+            {
+                id: 'ph_2',
+                area: 'PRASADAM HALL',
+                task: 'Choose floor and wall tiles with Achintya Krishna',
+                status: 'PENDING - market visit today',
+                deadline: '2025-11-21',
+                priority: 'high',
+                notes: '',
+                completed: false,
+                comments: []
+            },
+            {
+                id: 'ph_3',
+                area: 'PRASADAM HALL',
+                task: 'Place orders for tiles, cables, trays, materials',
+                status: 'CABLE TRAY IN STOCK WORK WILL BE FINISHED ON 22/11/25',
+                deadline: '2025-11-22',
+                priority: 'medium',
+                notes: 'Once selections are approved',
+                completed: false,
+                comments: []
+            },
+            {
+                id: 'ab_1',
+                area: 'ASHRAM / BRAHMACHARI AREA',
+                task: 'One large ashram window installation',
+                status: 'COMPLETED',
+                deadline: '2025-11-20',
+                priority: 'medium',
+                notes: 'Verify completion',
+                completed: false,
+                comments: []
+            },
+            {
+                id: 'st_1',
+                area: 'STP & PUBLIC TOILET',
+                task: 'Monitor public toilet functioning',
+                status: 'ALL CLEAR - functioning properly',
+                deadline: '2025-12-01',
+                priority: 'low',
+                notes: 'Newly completed',
+                completed: false,
+                comments: []
+            },
+            {
+                id: 'pa_1',
+                area: 'ROAD (PAVER AREA)',
+                task: 'Reassess expectations for leveling',
+                status: 'DONE',
+                deadline: '2025-11-20',
+                priority: 'medium',
+                notes: 'Due to sand-based paver installation',
+                completed: false,
+                comments: []
+            }
+        ];
+        this.saveTasks();
     }
 
     parseComments(commentsStr) {
@@ -143,6 +212,17 @@ class TaskManager {
             return Array.isArray(parsed) ? parsed : [];
         } catch {
             return [];
+        }
+    }
+
+    async syncTasksInBackground() {
+        try {
+            await this.loadFromGoogleSheets();
+            this.applyFilters();
+            this.updateStats();
+        } catch (error) {
+            // Silent fail for background sync
+            console.log('Background sync failed:', error);
         }
     }
 
@@ -156,7 +236,7 @@ class TaskManager {
             this.updateStats();
         } catch (error) {
             console.error('Sync error:', error);
-            this.showToast('⚠️ Sync failed. Using local data.');
+            this.showToast('⚠️ Sync failed. Please check: 1) API key restrictions in Google Cloud Console, 2) Add https://truckboardcom.github.io/* to allowed referrers');
         }
 
         this.showLoading(false);
