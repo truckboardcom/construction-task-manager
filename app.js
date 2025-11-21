@@ -24,6 +24,14 @@ class TaskManager {
     attachEventListeners() {
         document.getElementById('syncBtn').addEventListener('click', () => this.syncTasks());
         document.getElementById('addTaskBtn').addEventListener('click', () => this.openTaskModal());
+
+        // Changelog modal
+        document.getElementById('versionBadge').addEventListener('click', () => this.openChangelogModal());
+        document.getElementById('changelogClose').addEventListener('click', () => this.closeChangelogModal());
+        document.getElementById('changelogModal').addEventListener('click', (e) => {
+            if (e.target.id === 'changelogModal') this.closeChangelogModal();
+        });
+
         document.getElementById('searchInput').addEventListener('input', (e) => this.handleSearch(e.target.value));
         document.getElementById('areaFilter').addEventListener('change', () => this.applyFilters());
         document.getElementById('statusFilter').addEventListener('change', () => this.applyFilters());
@@ -292,4 +300,17 @@ document.addEventListener('DOMContentLoaded', () => { taskManager = new TaskMana
         this.showToast('✅ Saved!');
     }
 
+
+
+    openChangelogModal() {
+        const modal = document.getElementById('changelogModal');
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeChangelogModal() {
+        const modal = document.getElementById('changelogModal');
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
 ;
