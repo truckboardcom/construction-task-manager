@@ -4,14 +4,20 @@ class TaskManager {
         this.tasks = [];
         this.filteredTasks = [];
         this.currentTaskId = null;
-        this.SPREADSHEET_ID = '1nTfznnbmz2_8QgRlRBhLZIPEK5LBjRSVyEtVmsIPCzs';
-        this.API_KEY = 'YOUR_GOOGLE_API_KEY'; // User needs to add their API key
+        this.SPREADSHEET_ID = CONFIG.SPREADSHEET_ID;
+        this.API_KEY = CONFIG.API_KEY;
+        this.SHEET_NAME = CONFIG.SHEET_NAME;
         this.init();
     }
 
     init() {
         this.loadTasks();
         this.attachEventListeners();
+
+        // Auto-sync if enabled
+        if (CONFIG.AUTO_SYNC_ENABLED) {
+            setInterval(() => this.syncTasks(), CONFIG.AUTO_SYNC_INTERVAL);
+        }
     }
 
     attachEventListeners() {
@@ -46,51 +52,12 @@ class TaskManager {
     async loadTasks() {
         this.showLoading(true);
 
-        // Sample data (fallback if Google Sheets API not configured)
-        const sampleTasks = [
-            {
-                id: 'ph_1',
-                area: 'PRASADAM HALL',
-                task: 'Finalize ceiling design',
-                status: 'MATERIAL & DESIGN IS STILL TO BE FINALIZED',
-                deadline: '2025-11-30',
-                priority: 'high',
-                notes: '',
-                completed: false,
-                comments: []
-            },
-            {
-                id: 'ph_2',
-                area: 'PRASADAM HALL',
-                task: 'Choose floor and wall tiles with Achintya Krishna',
-                status: 'PENDING - market visit today',
-                deadline: '2025-11-21',
-                priority: 'high',
-                notes: '',
-                completed: false,
-                comments: []
-            },
-            {
-                id: 'ab_1',
-                area: 'ASHRAM / BRAHMACHARI AREA',
-                task: 'One large ashram window installation',
-                status: 'COMPLETED',
-                deadline: '2025-11-20',
-                priority: 'medium',
-                notes: 'Verify completion',
-                completed: false,
-                comments: []
-            }
-        ];
-
-        // Try to load from localStorage first
-        const savedTasks = localStorage.getItem('constructionTasks');
-        if (savedTasks) {
-            this.tasks = JSON.parse(savedTasks);
-        } else {
-            // Use sample data
-            this.tasks = sampleTasks;
-            this.saveTasks();
+        // Try to load from Google Sheets
+        try {
+            await this.loadFromGoogleSheets();
+        } catch (error) {
+            console.log('Google Sheets load failed, using localStorage:', error);
+            this.loadFromLocalStorage();
         }
 
         this.filteredTasks = [...this.tasks];
@@ -100,15 +67,99 @@ class TaskManager {
         this.showLoading(false);
     }
 
+    async loadFromGoogleSheets() {
+        if (!this.API_KEY || this.API_KEY === 'YOUR_GOOGLE_API_KEY') {
+            throw new Error('API key not configured');
+        }
+
+        const url = `${CONFIG.SHEETS_API_BASE}/${this.SPREADSHEET_ID}/values/${encodeURIComponent(this.SHEET_NAME)}!A:I?key=${this.API_KEY}`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const rows = data.values || [];
+
+        if (rows.length < 2) {
+            throw new Error('No data in sheet');
+        }
+
+        // Skip header row
+        this.tasks = rows.slice(1).map(row => ({
+            id: row[0] || '',
+            area: row[1] || '',
+            task: row[2] || '',
+            status: row[3] || '',
+            deadline: row[4] || '',
+            priority: (row[5] || 'medium').toLowerCase(),
+            notes: row[6] || '',
+            completed: row[7] === 'TRUE',
+            comments: this.parseComments(row[8] || '[]')
+        }));
+
+        // Save to localStorage as backup
+        this.saveTasks();
+        this.showToast('✅ Synced with Google Sheets!');
+    }
+
+    loadFromLocalStorage() {
+        const savedTasks = localStorage.getItem('constructionTasks');
+        if (savedTasks) {
+            this.tasks = JSON.parse(savedTasks);
+        } else {
+            // Sample data
+            this.tasks = [
+                {
+                    id: 'ph_1',
+                    area: 'PRASADAM HALL',
+                    task: 'Finalize ceiling design',
+                    status: 'MATERIAL & DESIGN IS STILL TO BE FINALIZED',
+                    deadline: '2025-11-30',
+                    priority: 'high',
+                    notes: '',
+                    completed: false,
+                    comments: []
+                },
+                {
+                    id: 'ph_2',
+                    area: 'PRASADAM HALL',
+                    task: 'Choose floor and wall tiles with Achintya Krishna',
+                    status: 'PENDING - market visit today',
+                    deadline: '2025-11-21',
+                    priority: 'high',
+                    notes: '',
+                    completed: false,
+                    comments: []
+                }
+            ];
+        }
+    }
+
+    parseComments(commentsStr) {
+        try {
+            const parsed = JSON.parse(commentsStr);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+
     async syncTasks() {
         this.showLoading(true);
-        this.showToast('Syncing with Google Sheets...');
+        this.showToast('🔄 Syncing with Google Sheets...');
 
-        // Simulate sync (in production, this would call Google Sheets API)
-        setTimeout(() => {
-            this.showLoading(false);
-            this.showToast('Sync completed successfully!');
-        }, 1500);
+        try {
+            await this.loadFromGoogleSheets();
+            this.applyFilters();
+            this.updateStats();
+        } catch (error) {
+            console.error('Sync error:', error);
+            this.showToast('⚠️ Sync failed. Using local data.');
+        }
+
+        this.showLoading(false);
     }
 
     renderTasks() {
@@ -258,7 +309,7 @@ class TaskManager {
         this.updateStats();
         this.populateAreaFilter();
         this.closeModal();
-        this.showToast('Task saved successfully!');
+        this.showToast('✅ Task saved successfully!');
     }
 
     toggleComplete(taskId) {
@@ -268,7 +319,7 @@ class TaskManager {
             this.saveTasks();
             this.applyFilters();
             this.updateStats();
-            this.showToast(task.completed ? 'Task marked as complete!' : 'Task marked as incomplete');
+            this.showToast(task.completed ? '✅ Task completed!' : '🔄 Task reopened');
         }
     }
 
@@ -310,7 +361,7 @@ class TaskManager {
             this.saveTasks();
             this.renderComments(task.comments);
             document.getElementById('newComment').value = '';
-            this.showToast('Comment added!');
+            this.showToast('💬 Comment added!');
         }
     }
 
